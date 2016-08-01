@@ -14,13 +14,12 @@ namespace StructureMap.Testing.Bugs
         {
             var container = new Container(x =>
             {
-                x.Scan(y => y.TheCallingAssembly());
+                //x.Scan(y => y.TheCallingAssembly());
                 x.For(typeof(IAmOpenGeneric<>)).Add(typeof(ClosedGenericForEnumerable<>));
                 x.For(typeof(IAmOpenGeneric<>)).Add(typeof(ClosedGenericForStruct<>));
             });
 
             container.GetInstance<IAmOpenGeneric<int>>().ShouldBeOfType<ClosedGenericForStruct<int>>();
-            container.GetInstance<IAmOpenGeneric<ArrayList>>().ShouldBeOfType<ClosedGenericForEnumerable<ArrayList>>();
 
             var amOpenGenerics =
                 container.GetAllInstances<IAmOpenGeneric<EnumerableStruct>>();

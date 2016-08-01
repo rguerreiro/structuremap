@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using StructureMap.Configuration.DSL;
 using StructureMap.Configuration.DSL.Expressions;
-using StructureMap.Diagnostics;
 using StructureMap.Graph.Scanning;
 using StructureMap.TypeRules;
 
@@ -17,14 +16,10 @@ namespace StructureMap.Graph
     public class AssemblyScanner : IAssemblyScanner
     {
         private readonly List<Assembly> _assemblies = new List<Assembly>();
-        private readonly List<IRegistrationConvention> _conventions = new List<IRegistrationConvention>();
         private readonly CompositeFilter<Type> _filter = new CompositeFilter<Type>();
-        private readonly List<AssemblyScanRecord> _records = new List<AssemblyScanRecord>(); 
+        private readonly List<AssemblyScanRecord> _records = new List<AssemblyScanRecord>();
 
-        public int Count
-        {
-            get { return _assemblies.Count; }
-        }
+        public int Count => _assemblies.Count;
 
         public string Description { get; set; }
 
@@ -32,9 +27,7 @@ namespace StructureMap.Graph
         public void Assembly(Assembly assembly)
         {
             if (!_assemblies.Contains(assembly))
-            {
                 _assemblies.Add(assembly);
-            }
         }
 
         public void Assembly(string assemblyName)
@@ -42,27 +35,13 @@ namespace StructureMap.Graph
             Assembly(AssemblyLoader.ByName(assemblyName));
         }
 
-        public void Describe(StringWriter writer)
-        {
-            writer.WriteLine(Description);
-            writer.WriteLine("Assemblies");
-            writer.WriteLine("----------");
-
-            _records.OrderBy(x => x.Name).Each(x => writer.WriteLine("* " + x));
-            writer.WriteLine();
-
-            writer.WriteLine("Conventions");
-            writer.WriteLine("--------");
-            _conventions.Each(x => writer.WriteLine("* " + x));
-        }
+        public List<IRegistrationConvention> Conventions { get; } = new List<IRegistrationConvention>();
 
         public void Convention<T>() where T : IRegistrationConvention, new()
         {
-            var previous = _conventions.FirstOrDefault(scanner => scanner is T);
+            var previous = Conventions.FirstOrDefault(scanner => scanner is T);
             if (previous == null)
-            {
                 With(new T());
-            }
         }
 
         public void LookForRegistries()
@@ -82,7 +61,7 @@ namespace StructureMap.Graph
 
         public FindAllTypesFilter AddAllTypesOf<TPluginType>()
         {
-            return AddAllTypesOf(typeof (TPluginType));
+            return AddAllTypesOf(typeof(TPluginType));
         }
 
         public FindAllTypesFilter AddAllTypesOf(Type pluginType)
@@ -106,7 +85,7 @@ namespace StructureMap.Graph
 
         public void ExcludeNamespaceContainingType<T>()
         {
-            ExcludeNamespace(typeof (T).Namespace);
+            ExcludeNamespace(typeof(T).Namespace);
         }
 
         public void Include(Func<Type, bool> predicate)
@@ -121,39 +100,17 @@ namespace StructureMap.Graph
 
         public void IncludeNamespaceContainingType<T>()
         {
-            IncludeNamespace(typeof (T).Namespace);
+            IncludeNamespace(typeof(T).Namespace);
         }
 
         public void ExcludeType<T>()
         {
-            Exclude(type => type == typeof (T));
+            Exclude(type => type == typeof(T));
         }
 
         public void With(IRegistrationConvention convention)
         {
-            _conventions.Fill(convention);
-        }
-
-        public Task<Registry> ScanForTypes()
-        {
-            return TypeRepository.FindTypes(_assemblies, type => _filter.Matches(type)).ContinueWith(t =>
-            {
-                var registry = new Registry();
-
-                _records.AddRange(t.Result.Records);
-
-                _conventions.Each(x => x.ScanTypes(t.Result, registry));
-
-                return registry;
-            });
-        }
-
-
-        public bool Contains(string assemblyName)
-        {
-            return _assemblies
-                .Select(assembly => new AssemblyName(assembly.FullName))
-                .Any(aName => aName.Name == assemblyName);
+            Conventions.Fill(convention);
         }
 
         public ConfigureConventionExpression WithDefaultConventions()
@@ -185,14 +142,211 @@ namespace StructureMap.Graph
             return new ConfigureConventionExpression(convention);
         }
 
+        public void Describe(StringWriter writer)
+        {
+            writer.WriteLine(Description);
+            writer.WriteLine("Assemblies");
+            writer.WriteLine("----------");
+
+            _records.OrderBy(x => x.Name).Each(x => writer.WriteLine("* " + x));
+            writer.WriteLine();
+
+            writer.WriteLine("Conventions");
+            writer.WriteLine("--------");
+            Conventions.Each(x => writer.WriteLine("* " + x));
+        }
+
+        public Task<Registry> ScanForTypes()
+        {
+            if (!Conventions.Any())
+            {
+                throw new StructureMapConfigurationException($"There are no {nameof(IRegistrationConvention)}'s in this scanning operation. ");
+            }
+
+            return TypeRepository.FindTypes(_assemblies, type => _filter.Matches(type)).ContinueWith(t =>
+            {
+                var registry = new Registry();
+
+                _records.AddRange(t.Result.Records);
+
+                Conventions.Each(x => x.ScanTypes(t.Result, registry));
+
+                return registry;
+            });
+        }
+
+
+        public bool Contains(string assemblyName)
+        {
+            return _assemblies
+                .Select(assembly => new AssemblyName(assembly.FullName))
+                .Any(aName => aName.Name == assemblyName);
+        }
+
         public bool HasAssemblies()
         {
             return _assemblies.Any();
         }
+
+
+        public void TheCallingAssembly()
+        {
+            var callingAssembly = findTheCallingAssembly();
+
+            if (callingAssembly != null)
+            {
+                Assembly(callingAssembly);
+            }
+            else
+            {
+                throw new StructureMapConfigurationException("Could not determine the calling assembly, you may need to explicitly call IAssemblyScanner.Assembly()");
+            }
+        }
+
+        public void AssembliesFromApplicationBaseDirectory()
+        {
+            AssembliesFromApplicationBaseDirectory(a => true);
+        }
+
+        public void AssembliesFromApplicationBaseDirectory(Func<Assembly, bool> assemblyFilter)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(assemblyFilter, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: false);
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+        /// <summary>
+        /// Choosing option will direct StructureMap to *also* scan files ending in '*.exe'
+        /// </summary>
+        /// <param name="scanner"></param>
+        /// <param name="assemblyFilter"></param>
+        /// <param name="includeExeFiles"></param>
+        public void AssembliesAndExecutablesFromApplicationBaseDirectory(Func<Assembly, bool> assemblyFilter = null)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(assemblyFilter, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: true);
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+        public void AssembliesAndExecutablesFromPath(string path)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(path, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: true);
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+        public void AssembliesFromPath(string path)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(path, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: false);
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+        public void AssembliesAndExecutablesFromPath(string path,
+            Func<Assembly, bool> assemblyFilter)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(path, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: true).Where(assemblyFilter);
+
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+        public void AssembliesFromPath(string path,
+            Func<Assembly, bool> assemblyFilter)
+        {
+            var assemblies = AssemblyFinder.FindAssemblies(path, txt =>
+            {
+                Console.WriteLine("StructureMap could not load assembly from file " + txt);
+            }, includeExeFiles: false).Where(assemblyFilter);
+
+
+            foreach (var assembly in assemblies)
+            {
+                Assembly(assembly);
+            }
+        }
+
+#if NET45
+        private static Assembly findTheCallingAssembly()
+        {
+            var trace = new StackTrace(false);
+
+            var thisAssembly = System.Reflection.Assembly.GetExecutingAssembly();
+            var smAssembly = typeof(Registry).Assembly;
+
+            Assembly callingAssembly = null;
+            for (var i = 0; i < trace.FrameCount; i++)
+            {
+                var frame = trace.GetFrame(i);
+                var assembly = frame.GetMethod().DeclaringType.Assembly;
+                if (assembly != thisAssembly && assembly != smAssembly)
+                {
+                    callingAssembly = assembly;
+                    break;
+                }
+            }
+            return callingAssembly;
+        }
+#else
+        private static Assembly findTheCallingAssembly()
+        {
+            string trace = Environment.StackTrace;
+
+            var parts = trace.Split('\n');
+            var candidate = parts[4].Trim().Substring(3);
+
+            Assembly assembly = null;
+            var names = candidate.Split('.');
+            for (var i = names.Length - 2; i > 0; i--) {
+                var possibility = string.Join(".", names.Take(i).ToArray());
+
+                try 
+                {
+
+                    assembly = System.Reflection.Assembly.Load(new AssemblyName(possibility));
+                    break;
+                }
+                catch (Exception e)
+                {
+                  // Nothing
+                }
+            }
+
+            return assembly;
+        }
+
+#endif
     }
-
-
 }
-
 
 #pragma warning restore 1591

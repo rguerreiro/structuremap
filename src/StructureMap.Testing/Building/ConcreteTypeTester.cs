@@ -23,7 +23,6 @@ namespace StructureMap.Testing.Building
             ConcreteType.SourceFor(new Policies(PluginGraph.CreateRoot()), ConcreteType.ConstructorArgument, "SomeArg", typeof(IGateway), source)
                 .ShouldBeTheSameAs(source);
         }
-
         [Fact]
         public void no_value_for_non_simple_resolves_to_default_source()
         {

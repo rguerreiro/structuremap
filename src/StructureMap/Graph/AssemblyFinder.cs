@@ -10,6 +10,7 @@ namespace StructureMap.Graph
     {
         public static IEnumerable<Assembly> FindAssemblies(Action<string> logFailure, bool includeExeFiles)
         {
+#if NET45
             var assemblyPath = AppDomain.CurrentDomain.BaseDirectory;
             var binPath = AppDomain.CurrentDomain.SetupInformation.PrivateBinPath;
 
@@ -31,8 +32,21 @@ namespace StructureMap.Graph
                 var path = Path.Combine(assemblyPath, bin);
                 return FindAssemblies(path, logFailure, includeExeFiles);
             });
+#else
+            string path;
+            try {
+                path = AppContext.BaseDirectory;
+            }
+            catch (Exception) {
+                path = System.IO.Directory.GetCurrentDirectory();
+            }
 
-            
+            Console.WriteLine("The path is: " + path);
+
+            return FindAssemblies(path, logFailure, includeExeFiles);
+#endif
+
+
         }
 
         public static IEnumerable<Assembly> FindAssemblies(string assemblyPath, Action<string> logFailure, bool includeExeFiles)
@@ -53,13 +67,32 @@ namespace StructureMap.Graph
 
                 try
                 {
+#if NET45
                     assembly = AppDomain.CurrentDomain.Load(name);
+#endif
+
+                    #if NETSTANDARD13
+                    assembly = Assembly.Load(new AssemblyName(name));
+                    #endif
+
+#if NETSTANDARD15
+                    assembly = System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyName(new AssemblyName(name));
+#endif
                 }
                 catch (Exception)
                 {
                     try
                     {
+#if NET45
                         assembly = Assembly.LoadFrom(file);
+#endif
+
+
+
+
+#if NETSTANDARD15
+                        assembly = System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(file);
+#endif
                     }
                     catch (Exception)
                     {

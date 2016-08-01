@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+
 using StructureMap.TypeRules;
 
 namespace StructureMap

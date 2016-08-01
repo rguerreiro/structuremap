@@ -37,13 +37,13 @@ namespace StructureMap.Testing.Graph
     {
         public AssemblyScannerTesterFixture()
         {
-            var binFolder = Path.GetDirectoryName(GetType().Assembly.Location);
+            var binFolder = Path.GetDirectoryName(GetType().GetAssembly().Location);
             AssemblyScanningFolder = Path.Combine(binFolder, "DynamicallyLoaded");
             if (!Directory.Exists(AssemblyScanningFolder)) Directory.CreateDirectory(AssemblyScanningFolder);
 
-            var assembly1 = typeof(RedGreenRegistry).Assembly.Location;
-            var assembly2 = typeof(IWorker).Assembly.Location;
-            var assembly3 = typeof(IDefinedInExe).Assembly.Location;
+            var assembly1 = typeof(RedGreenRegistry).GetAssembly().Location;
+            var assembly2 = typeof(IWorker).GetAssembly().Location;
+            var assembly3 = typeof(IDefinedInExe).GetAssembly().Location;
 
             File.Copy(assembly1, Path.Combine(AssemblyScanningFolder, Path.GetFileName(assembly1)), true);
             File.Copy(assembly2, Path.Combine(AssemblyScanningFolder, Path.GetFileName(assembly2)), true);
@@ -141,6 +141,7 @@ namespace StructureMap.Testing.Graph
             typeof(class_outside_namespace).IsInNamespace("StructureMap").ShouldBeFalse();
         }
 
+#if NET451
         // SAMPLE: scan-filesystem
         [Fact]
         public void scan_all_assemblies_in_a_folder()
@@ -173,6 +174,7 @@ namespace StructureMap.Testing.Graph
             shouldHaveFamilyWithSameName<IDefinedInExe>();
         }
 
+
         [Fact]
         public void scan_all_assemblies_in_application_base_directory_including_exe()
         {
@@ -199,7 +201,7 @@ namespace StructureMap.Testing.Graph
         [Fact]
         public void scan_specific_assemblies_in_a_folder()
         {
-            var assemblyToSpecificallyExclude = typeof(IWorker).Assembly.GetName().Name;
+            var assemblyToSpecificallyExclude = typeof(IWorker).GetAssembly().GetName().Name;
             Scan(
                 x =>
                     x.AssembliesFromPath(assemblyScanningFolder,
@@ -212,7 +214,7 @@ namespace StructureMap.Testing.Graph
         [Fact]
         public void scan_specific_assemblies_in_application_base_directory()
         {
-            var assemblyToSpecificallyExclude = typeof(IWorker).Assembly.GetName().Name;
+            var assemblyToSpecificallyExclude = typeof(IWorker).GetAssembly().GetName().Name;
             Scan(
                 x =>
                     x.AssembliesFromPath(assemblyScanningFolder,
@@ -221,6 +223,8 @@ namespace StructureMap.Testing.Graph
             shouldHaveFamilyWithSameName<IInterfaceInWidget5>();
             shouldNotHaveFamilyWithSameName<IWorker>();
         }
+#endif
+
 
         // SAMPLE: scan-for-registries
         [Fact]

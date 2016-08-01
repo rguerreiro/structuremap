@@ -1,7 +1,6 @@
 {
   "version": "1.0.0-*",
   "buildOptions": {
-    "debugType": "portable",
     "emitEntryPoint": true
   },
   "dependencies": {
@@ -10,15 +9,13 @@
   },
   "frameworks": {
     "net45": {
-      "frameworkAssemblies": {
-        "System.Data": "",
-        "System.Numerics": "",
-        "System.Runtime.Serialization": "",
-        "System.Xml": "",
-        "System.Xml.Linq": ""
-      },
+    },
+    "netcoreapp1.0": {
       "dependencies": {
-        "Microsoft.NETCore.Platforms": "1.0.1"
+        "Microsoft.NETCore.App": {
+          "type": "platform",
+          "version": "1.0.0"
+        }
       }
     }
   }

@@ -4,8 +4,6 @@ using StructureMap.Pipeline;
 using StructureMap.Testing.Widget;
 using StructureMap.Testing.Widget3;
 using System;
-using System.Data;
-using System.Diagnostics;
 using System.Linq;
 using Xunit;
 
@@ -150,6 +148,19 @@ namespace StructureMap.Testing.Graph
             family.AddType(GetType());
 
             family.Instances.Any().ShouldBeFalse();
+        }
+
+        public class DataTable : IServiceProvider {
+            public object GetService(Type serviceType)
+            {
+                throw new NotImplementedException();
+            }
+        }
+        public class DataSet : IServiceProvider {
+            public object GetService(Type serviceType)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         [Fact]
